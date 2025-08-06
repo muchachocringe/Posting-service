@@ -20,12 +20,12 @@ func (s ParcelStore) Add(p Parcel) (int, error) {
 		p.Client, p.Status, p.Address, p.CreatedAt,
 	)
 	if err != nil {
-		return 0, fmt.Errorf("ошибка при добавлении посылки: %v", err)
+		return 0, fmt.Errorf("ошибка при добавлении посылки: %w", err)
 	}
 
 	id, err := res.LastInsertId()
 	if err != nil {
-		return 0, fmt.Errorf("ошибка при получении ID: %v", err)
+		return 0, fmt.Errorf("ошибка при получении ID: %w", err)
 	}
 
 	// верните идентификатор последней добавленной записи
@@ -49,7 +49,7 @@ func (s ParcelStore) Get(number int) (Parcel, error) {
 		if err == sql.ErrNoRows {
 			return p, fmt.Errorf("посылка с номером %d не найдена", number)
 		}
-		return p, fmt.Errorf("ошибка при чтении посылки: %v", err)
+		return p, fmt.Errorf("ошибка при чтении посылки: %w", err)
 	}
 
 	return p, nil
@@ -64,7 +64,7 @@ func (s ParcelStore) GetByClient(client int) ([]Parcel, error) {
 		client,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка при запросе посылок клиента: %v", err)
+		return nil, fmt.Errorf("ошибка при запросе посылок клиента: %w", err)
 	}
 	defer rows.Close()
 
@@ -75,13 +75,13 @@ func (s ParcelStore) GetByClient(client int) ([]Parcel, error) {
 		p := Parcel{}
 		err := rows.Scan(&p.Number, &p.Client, &p.Status, &p.Address, &p.CreatedAt)
 		if err != nil {
-			return nil, fmt.Errorf("ошибка при сканировании посылки: %v", err)
+			return nil, fmt.Errorf("ошибка при сканировании посылки: %w", err)
 		}
 		res = append(res, p)
 	}
 
 	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("ошибка при обработке результатов: %v", err)
+		return nil, fmt.Errorf("ошибка при обработке результатов: %w", err)
 	}
 
 	return res, nil
@@ -95,7 +95,7 @@ func (s ParcelStore) SetStatus(number int, status string) error {
 		status, number,
 	)
 	if err != nil {
-		return fmt.Errorf("ошибка при обновлении статуса: %v", err)
+		return fmt.Errorf("ошибка при обновлении статуса: %w", err)
 	}
 
 	return nil
@@ -105,22 +105,24 @@ func (s ParcelStore) SetAddress(number int, address string) error {
 	// реализуйте обновление адреса в таблице parcel
 	// менять адрес можно только если значение статуса registered
 
-	p, err := s.Get(number)
-	if err != nil {
-		return fmt.Errorf("ошибка при проверке статуса: %v", err)
-	}
-
-	if p.Status != ParcelStatusRegistered {
-		return fmt.Errorf("нельзя изменить адрес: статус посылки должен быть '%s', а не '%s'",
-			ParcelStatusRegistered, p.Status)
-	}
-
-	_, err = s.db.Exec(
-		"UPDATE parcel SET address = ? WHERE number = ?",
-		address, number,
+	result, err := s.db.Exec(
+		"UPDATE parcel SET address = ? WHERE number = ? AND status = ?",
+		address,
+		number,
+		ParcelStatusRegistered,
 	)
 	if err != nil {
-		return fmt.Errorf("ошибка при обновлении адреса: %v", err)
+		return fmt.Errorf("ошибка при обновлении адреса: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("ошибка при проверке обновленных строк: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("нельзя изменить адрес: посылка не найдена, или статус не '%s'",
+			ParcelStatusRegistered)
 	}
 
 	return nil
@@ -130,22 +132,22 @@ func (s ParcelStore) Delete(number int) error {
 	// реализуйте удаление строки из таблицы parcel
 	// удалять строку можно только если значение статуса registered
 
-	p, err := s.Get(number)
-	if err != nil {
-		return fmt.Errorf("ошибка при проверке статуса: %v", err)
-	}
-
-	if p.Status != ParcelStatusRegistered {
-		return fmt.Errorf("нельзя удалить посылку: статус должен быть '%s', а не '%s'",
-			ParcelStatusRegistered, p.Status)
-	}
-
-	_, err = s.db.Exec(
-		"DELETE FROM parcel WHERE number = ?",
+	result, err := s.db.Exec(
+		"DELETE FROM parcel WHERE number = ? AND status = ?",
 		number,
+		ParcelStatusRegistered,
 	)
 	if err != nil {
-		return fmt.Errorf("ошибка при удалении посылки: %v", err)
+		return fmt.Errorf("ошибка при удалении посылки: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("ошибка при проверке результата удаления: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("нельзя удалить посылку: либо посылка не найдена, либо статус не %s", ParcelStatusRegistered)
 	}
 
 	return nil

@@ -73,13 +73,13 @@ func TestAddGetDelete(t *testing.T) {
 // TestSetAddress проверяет обновление адреса
 func TestSetAddress(t *testing.T) {
 	// prepare
-	db, err := sql.Open("sqlite", "tracker.db")
+	db, err := sql.Open("sqlite", "tracker.db") // настройте подключение к БД
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	defer db.Close() // настройте подключение к БД
+	defer db.Close()
 
 	store := NewParcelStore(db)
 	parcel := getTestParcel()
@@ -109,14 +109,14 @@ func TestSetAddress(t *testing.T) {
 // TestSetStatus проверяет обновление статуса
 func TestSetStatus(t *testing.T) {
 	// prepare
-	db, err := sql.Open("sqlite", "tracker.db")
+	db, err := sql.Open("sqlite", "tracker.db") // настройте подключение к БД
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
 	defer db.Close()
-	// настройте подключение к БД
+
 	store := NewParcelStore(db)
 	parcel := getTestParcel()
 
@@ -145,6 +145,12 @@ func TestSetStatus(t *testing.T) {
 func TestGetByClient(t *testing.T) {
 	// prepare
 	db, err := sql.Open("sqlite", "tracker.db") // настройте подключение к БД
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer db.Close()
+
 	store := NewParcelStore(db)
 
 	parcels := []Parcel{
@@ -185,14 +191,13 @@ func TestGetByClient(t *testing.T) {
 	// check
 	for _, parcel := range storedParcels {
 		expectedParcel, exists := parcelMap[parcel.Number]
-		require.True(t, exists)
+		require.True(t, exists, parcel.Number)
 
-		require.Equal(t, expectedParcel.Client, parcel.Client)
-		require.Equal(t, expectedParcel.Status, parcel.Status)
-		require.Equal(t, expectedParcel.Address, parcel.Address)
-		require.Equal(t, expectedParcel.CreatedAt, parcel.CreatedAt)
+		require.Equal(t, expectedParcel, parcel, "Посылка с номером %d не соответствует ожидаемой", parcel.Number)
+		delete(parcelMap, parcel.Number)
 		// в parcelMap лежат добавленные посылки, ключ - идентификатор посылки, значение - сама посылка
 		// убедитесь, что все посылки из storedParcels есть в parcelMap
 		// убедитесь, что значения полей полученных посылок заполнены верно
 	}
+	require.Empty(t, parcelMap, "Не все ожидаемые посылки были получены из хранилища")
 }
