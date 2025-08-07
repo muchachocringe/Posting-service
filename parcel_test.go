@@ -150,6 +150,7 @@ func TestGetByClient(t *testing.T) {
 		return
 	}
 	defer db.Close()
+	//
 
 	store := NewParcelStore(db)
 
